@@ -35,6 +35,7 @@ const todayISO = () => {
 // Both modes return a standard Response, so the rest of the app doesn't care where Python runs.
 let worker = null;
 let workerSeq = 0;
+let engineStage = MODE === "browser" ? "starting" : "ready";
 const workerWaiters = new Map();
 
 function startWorker() {
@@ -51,6 +52,7 @@ function startWorker() {
 }
 
 async function workerFetch(path, options = {}) {
+  if (!worker) startWorker();
   // Let the browser encode the body (JSON or multipart FormData) exactly as fetch would.
   const req = new Request(new URL(`api${path}`, location.href), options);
   const body = await req.arrayBuffer();
@@ -72,6 +74,8 @@ function transport(path, options) {
 }
 
 function onEngineStatus({ stage, message }) {
+  engineStage = stage;
+  document.body.dataset.engine = stage; // lets tests wait for "ready"
   const box = $("#engineStatus");
   const zone = $("#dropZone");
   if (stage === "ready") {
@@ -469,8 +473,10 @@ function toggleTheme() {
 
 // ---------------------------------------------------------------- wire up
 async function init() {
+  if (MODE === "browser") startWorker(); // start Python right away, in parallel with translations
   await initI18n();
   applyTranslations();
+  if (MODE === "browser" && engineStage !== "ready") onEngineStatus({ stage: engineStage });
   $("#langSelect").value = currentLang;
   $("#langSelect").addEventListener("change", async (e) => {
     await setLanguage(e.target.value);
@@ -521,10 +527,6 @@ async function init() {
   $("#csvBtn").addEventListener("click", () => download("/export.csv", "spendyfrd-transactions.csv"));
   $("#clearBtn").addEventListener("click", clearAll);
 
-  if (MODE === "browser") {
-    onEngineStatus({ stage: "runtime" });
-    startWorker();
-  }
   api("/categories")
     .then((cats) => { state.categories = cats; fillEntryCategories(); })
     .catch(() => {})
