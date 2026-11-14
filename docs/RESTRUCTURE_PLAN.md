@@ -169,4 +169,5 @@ category.
 
 ## 9. Hosting
 
-GitHub Pages only serves static files, so it cannot run the Python API. The options are covered in the hand-over notes.
+Option 1 was chosen: the same Python backend runs in the browser with Pyodide, so the app is hosted
+on GitHub Pages with no server. See [HOSTING.md](HOSTING.md).

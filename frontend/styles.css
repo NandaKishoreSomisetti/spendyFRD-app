@@ -137,6 +137,12 @@ main.wrap { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; pad
 .drop-sub .link { color: var(--accent); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
 .drop-hint { color: var(--muted); font-size: 12px; margin-top: 4px; }
 
+.engine-status { margin: 12px 0 0; font-size: 13px; padding: 8px 12px; border-radius: 8px; background: var(--surface-2); color: var(--muted); }
+.engine-status::before { content: ""; display: inline-block; width: 10px; height: 10px; margin-right: 8px; border-radius: 50%; border: 2px solid var(--accent); border-right-color: transparent; vertical-align: -1px; animation: spin .8s linear infinite; }
+.engine-status.err { background: var(--neg-soft); color: var(--neg); }
+.engine-status.err::before { display: none; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .engine-status::before { animation: none; } }
 .upload-results { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 6px; }
 .upload-results:empty { display: none; }
 .upload-results li { font-size: 13px; padding: 8px 12px; border-radius: 8px; background: var(--accent-soft); }

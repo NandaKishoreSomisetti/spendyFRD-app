@@ -51,7 +51,9 @@
     "privacyNote": "Your data stays on this computer.",
     "toggleTheme": "Toggle dark mode",
     "deleteRow": "Delete",
-    "language": "Language"
+    "language": "Language",
+    "engineLoading": "Starting the app… The first visit downloads about 25 MB; after that it's cached.",
+    "engineFailed": "Couldn't start the app. Check your internet connection and reload."
   },
   "categories": {
     "Food & Dining": "Food & Dining",

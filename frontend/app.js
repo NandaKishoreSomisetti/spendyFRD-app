@@ -1,7 +1,9 @@
 /* spendyFRD frontend: talks to the Python API at /api. No framework, no build step. */
 "use strict";
 
-// Normally served by FastAPI (same origin). Via VS Code Live Server (:5500) → API on :8000.
+// "server": FastAPI answers /api (same origin; VS Code Live Server :5500 → API on :8000).
+// "browser": the same Python backend runs in a Web Worker via Pyodide (GitHub Pages build).
+const MODE = window.SPENDY_CONFIG?.mode === "browser" ? "browser" : "server";
 const API = location.port === "5500" ? "http://localhost:8000/api" : "/api";
 const UNDO_MS = 5000;
 
@@ -29,12 +31,70 @@ const todayISO = () => {
   return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 };
 
+// ---------------------------------------------------------------- transport
+// Both modes return a standard Response, so the rest of the app doesn't care where Python runs.
+let worker = null;
+let workerSeq = 0;
+const workerWaiters = new Map();
+
+function startWorker() {
+  worker = new Worker("py-worker.js", { type: "module" });
+  worker.onmessage = (e) => {
+    const msg = e.data;
+    if (msg.type === "status") { onEngineStatus(msg); return; }
+    const waiter = workerWaiters.get(msg.id);
+    if (!waiter) return;
+    workerWaiters.delete(msg.id);
+    if (msg.error) waiter.reject(new Error(msg.error));
+    else waiter.resolve(msg);
+  };
+}
+
+async function workerFetch(path, options = {}) {
+  // Let the browser encode the body (JSON or multipart FormData) exactly as fetch would.
+  const req = new Request(new URL(`api${path}`, location.href), options);
+  const body = await req.arrayBuffer();
+  const url = new URL(req.url);
+  const id = ++workerSeq;
+  const reply = await new Promise((resolve, reject) => {
+    workerWaiters.set(id, { resolve, reject });
+    worker.postMessage({
+      id, method: req.method, path: `/api${path.split("?")[0]}`, query: url.search.slice(1),
+      headers: [...req.headers.entries()], body,
+    }, [body]);
+  });
+  const nullBody = reply.status === 204 || reply.status === 304;
+  return new Response(nullBody ? null : reply.body, { status: reply.status, headers: reply.headers });
+}
+
+function transport(path, options) {
+  return MODE === "browser" ? workerFetch(path, options) : fetch(API + path, options);
+}
+
+function onEngineStatus({ stage, message }) {
+  const box = $("#engineStatus");
+  const zone = $("#dropZone");
+  if (stage === "ready") {
+    box.hidden = true;
+    zone.classList.remove("busy");
+    return;
+  }
+  box.hidden = false;
+  if (stage === "failed") {
+    box.classList.add("err");
+    box.textContent = `${t("engineFailed")} (${message})`;
+  } else {
+    box.textContent = t("engineLoading");
+    zone.classList.add("busy");
+  }
+}
+
 async function api(path, options = {}) {
   let res;
   try {
-    res = await fetch(API + path, options);
-  } catch (_) {
-    throw new Error(t("serverDown"));
+    res = await transport(path, options);
+  } catch (err) {
+    throw new Error(MODE === "browser" ? `${t("engineFailed")} (${err.message})` : t("serverDown"));
   }
   if (!res.ok) {
     let detail = res.statusText;
@@ -285,14 +345,20 @@ function deleteWithUndo(id) {
   });
 }
 
-// Don't lose pending deletes if the tab closes during the undo window.
-window.addEventListener("pagehide", () => {
+// Don't lose pending deletes if the tab is hidden or closed during the undo window.
+function flushPendingDeletes() {
   for (const [id, handle] of state.pendingDeletes) {
     clearTimeout(handle);
-    fetch(`${API}/transactions/${id}`, { method: "DELETE", keepalive: true });
+    if (MODE === "browser") transport(`/transactions/${id}`, { method: "DELETE" }).catch(() => {});
+    else fetch(`${API}/transactions/${id}`, { method: "DELETE", keepalive: true });
+    state.transactions = state.transactions.filter((x) => x.id !== id);
   }
   state.pendingDeletes.clear();
+}
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") flushPendingDeletes();
 });
+window.addEventListener("pagehide", flushPendingDeletes);
 
 async function submitEntry(e) {
   e.preventDefault();
@@ -328,14 +394,28 @@ async function submitEntry(e) {
   }
 }
 
-function download(path) {
+async function download(path, filename) {
   if (!visibleAll().length) { toast(t("noDataReport")); return; }
   const a = document.createElement("a");
-  a.href = API + path;
-  a.download = "";
+  let objectUrl = null;
+  if (MODE === "browser") {
+    try {
+      const res = await transport(path);
+      if (!res.ok) throw new Error(res.statusText);
+      objectUrl = URL.createObjectURL(await res.blob());
+    } catch (err) {
+      toast(err.message, { error: true });
+      return;
+    }
+    a.href = objectUrl;
+  } else {
+    a.href = API + path;
+  }
+  a.download = filename;
   document.body.append(a);
   a.click();
   a.remove();
+  if (objectUrl) setTimeout(() => URL.revokeObjectURL(objectUrl), 10000);
 }
 
 async function clearAll() {
@@ -436,10 +516,15 @@ async function init() {
   $("#categoryChip").addEventListener("click", () => setCategoryFilter(null));
 
   // exports
-  $("#pdfBtn").addEventListener("click", () => download(`/report.pdf?lang=${currentLang}`));
-  $("#csvBtn").addEventListener("click", () => download("/export.csv"));
+  $("#pdfBtn").addEventListener("click", () =>
+    download(`/report.pdf?lang=${currentLang}`, `spendyfrd-report-${currentLang}.pdf`));
+  $("#csvBtn").addEventListener("click", () => download("/export.csv", "spendyfrd-transactions.csv"));
   $("#clearBtn").addEventListener("click", clearAll);
 
+  if (MODE === "browser") {
+    onEngineStatus({ stage: "runtime" });
+    startWorker();
+  }
   api("/categories")
     .then((cats) => { state.categories = cats; fillEntryCategories(); })
     .catch(() => {})

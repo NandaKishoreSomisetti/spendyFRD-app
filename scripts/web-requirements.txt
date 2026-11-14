@@ -1,0 +1,10 @@
+# Extra wheels for the browser build (Pyodide 314.0.7, ABI pyemscripten_2026_0).
+# Pyodide already ships: fastapi, pydantic, pillow, fonttools, cryptography, charset-normalizer.
+# Keep versions in step with backend/requirements.txt.
+python-multipart==0.0.33
+openpyxl==3.1.5
+et-xmlfile==2.0.0
+pdfminer.six==20260107
+pdfplumber==0.11.10
+fpdf2==2.9.0
+uharfbuzz==0.57.0

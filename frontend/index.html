@@ -49,6 +49,7 @@
         <input id="fileInput" type="file" multiple hidden
                accept=".pdf,.csv,.tsv,.txt,.xlsx,.xlsm,.json,.png,.jpg,.jpeg,.webp">
       </label>
+      <p id="engineStatus" class="engine-status" role="status" hidden></p>
       <ul id="uploadResults" class="upload-results" aria-live="polite"></ul>
 
       <div class="entry-row">
@@ -161,6 +162,7 @@
     <button id="toastAction" type="button" hidden></button>
   </div>
 
+  <script src="config.js"></script>
   <script src="i18n.js"></script>
   <script src="app.js"></script>
 </body>

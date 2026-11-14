@@ -5,8 +5,9 @@
  */
 const LANGS = ["en", "te", "hi"];
 const LANG_KEY = "spendyfrd_lang";
-// Same origin when served by FastAPI; VS Code Live Server (:5500) → API server on :8000.
-const LOCALES_BASE = location.port === "5500" ? "http://localhost:8000/locales" : "/locales";
+// Relative, so it works at "/" (FastAPI) and under a sub-path (GitHub Pages).
+// VS Code Live Server (:5500) → the API server on :8000 serves them.
+const LOCALES_BASE = location.port === "5500" ? "http://localhost:8000/locales" : "locales";
 
 const locales = {};
 let currentLang = "en";
