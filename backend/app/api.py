@@ -6,7 +6,7 @@ import io
 from collections import defaultdict
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
-from fastapi.responses import Response, StreamingResponse
+from fastapi.responses import Response
 
 from . import parsers
 from .categorizer import CATEGORIES, categorize, merchant_key
@@ -200,9 +200,8 @@ def export_csv(store: Store = Depends(get_store)):
     writer.writerow(["Date", "Description", "Category", "Type", "Amount", "Source"])
     for t in store.list():
         writer.writerow([t.date or "", t.description, t.category, t.type.value, t.amount, t.source])
-    buf.seek(0)
-    return StreamingResponse(
-        iter([buf.getvalue()]), media_type="text/csv",
+    return Response(
+        content=buf.getvalue().encode("utf-8"), media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": 'attachment; filename="spendyfrd-transactions.csv"'},
     )
 

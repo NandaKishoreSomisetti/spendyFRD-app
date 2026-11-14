@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import io
+import sys
 
 from ..models import ParsedRow
 from .text_parser import parse_text
@@ -12,6 +13,9 @@ class OCRUnavailable(RuntimeError):
 
 
 def parse(data: bytes) -> list[ParsedRow]:
+    if sys.platform == "emscripten":
+        raise OCRUnavailable("Image upload (OCR) isn't available in the web version. "
+                             "Upload a PDF, CSV or Excel file instead.")
     try:
         import pytesseract
         from PIL import Image

@@ -9,6 +9,7 @@ from __future__ import annotations
 import os
 import re
 import sqlite3
+import sys
 from pathlib import Path
 
 DEFAULT_DB = Path(__file__).resolve().parents[2] / "data" / "spendy.db"
@@ -26,8 +27,9 @@ def connect(path: str | Path | None = None) -> sqlite3.Connection:
     conn = sqlite3.connect(target, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
-    if target != ":memory:":
-        conn.execute("PRAGMA journal_mode = WAL")  # safe concurrent reads while writing
+    if target != ":memory:" and sys.platform != "emscripten":
+        # WAL allows reads during writes; the browser build (Pyodide) has no shared memory for it
+        conn.execute("PRAGMA journal_mode = WAL")
     migrate(conn)
     return conn
 
